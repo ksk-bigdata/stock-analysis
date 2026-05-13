@@ -59,19 +59,24 @@
       <div class="filter-row">
         <button class="btn btn-success" id="run-btn" onclick="runScreener()">스크리닝 시작</button>
         <div style="margin-left:8px;color:var(--text-muted);font-size:13px" id="status-text">결과가 없습니다. 스크리닝을 시작하세요.</div>
-        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
-          <span style="color:var(--text-muted);font-size:13px">시장:</span>
-          <button class="btn btn-outline active" onclick="filterMarket('ALL',this)">전체</button>
-          <button class="btn btn-outline" onclick="filterMarket('KOSPI',this)">KOSPI</button>
-          <button class="btn btn-outline" onclick="filterMarket('KOSDAQ',this)">KOSDAQ</button>
-          <span style="color:var(--text-muted);font-size:13px;margin-left:8px">최소 점수:</span>
-          <select id="min-score" onchange="applyFilters()" style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px">
-            <option value="50">50+</option>
-            <option value="60" selected>60+</option>
-            <option value="70">70+</option>
-            <option value="80">80+</option>
-          </select>
-        </div>
+      </div>
+      <div class="filter-row" style="margin-top:8px">
+        <span style="color:var(--text-muted);font-size:13px">시장:</span>
+        <button class="btn btn-outline active" onclick="filterMarket('ALL',this)">전체</button>
+        <button class="btn btn-outline" onclick="filterMarket('KOSPI',this)">KOSPI</button>
+        <button class="btn btn-outline" onclick="filterMarket('KOSDAQ',this)">KOSDAQ</button>
+        <span style="color:var(--text-muted);font-size:13px;margin-left:8px">시그널:</span>
+        <button class="btn btn-outline active signal-filter-btn" onclick="filterSignal('all',this)">전체</button>
+        <button class="btn btn-outline signal-filter-btn" onclick="filterSignal('golden_cross',this)">골든크로스</button>
+        <button class="btn btn-outline signal-filter-btn" onclick="filterSignal('volume',this)">거래량 급증</button>
+        <button class="btn btn-outline signal-filter-btn" onclick="filterSignal('ma_aligned',this)">정배열</button>
+        <span style="color:var(--text-muted);font-size:13px;margin-left:8px">최소 점수:</span>
+        <select id="min-score" onchange="applyFilters()" style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px">
+          <option value="50">50+</option>
+          <option value="60" selected>60+</option>
+          <option value="70">70+</option>
+          <option value="80">80+</option>
+        </select>
       </div>
       <div class="progress-bar" id="progress-bar" style="display:none">
         <div class="progress-fill" id="progress-fill" style="width:0%"></div>
@@ -90,7 +95,34 @@
     const BASE = 'https://stock-analysis-i3xj.onrender.com';
     let allResults = [];
     let currentMarket = 'ALL';
+    let currentSignalFilter = 'all';
     let pollTimer;
+
+    const SIGNAL_LABEL_MAP = {
+      golden_cross: 'MACD 골든크로스',
+      volume: '거래량 급증',
+      ma_aligned: '이동평균 정배열',
+    };
+
+    function filterSignal(type, btn) {
+      currentSignalFilter = type;
+      document.querySelectorAll('.signal-filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderFiltered();
+    }
+
+    function renderFiltered() {
+      let data = allResults;
+      const minScore = parseInt(document.getElementById('min-score').value);
+      if (currentMarket !== 'ALL') data = data.filter(r => r.market === currentMarket);
+      data = data.filter(r => r.score >= minScore);
+      if (currentSignalFilter !== 'all') {
+        const target = SIGNAL_LABEL_MAP[currentSignalFilter];
+        data = data.filter(r => r.signals && r.signals.some(s => s.label.startsWith(target.split(' ')[0])));
+      }
+      document.getElementById('status-text').textContent = `${data.length}개 종목`;
+      renderResults(data);
+    }
 
     // 검색
     function setupSearch() {
@@ -166,18 +198,17 @@
       const res = await fetch(`${BASE}/api/screener/results?min_score=${minScore}&market=${currentMarket}&limit=100`);
       const data = await res.json();
       allResults = data.results || [];
-      renderResults(allResults);
-      document.getElementById('status-text').textContent = `총 ${data.total}개 종목 (점수 ${minScore}+ 필터)`;
+      renderFiltered();
       resetBtn();
     }
 
-    function applyFilters() { fetchResults(); }
+    function applyFilters() { allResults.length ? renderFiltered() : fetchResults(); }
 
     function filterMarket(market, btn) {
       currentMarket = market;
-      document.querySelectorAll('.filter-row .btn-outline').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.filter-row .btn-outline:not(.signal-filter-btn)').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      applyFilters();
+      renderFiltered();
     }
 
     function scoreColor(s) {
@@ -221,15 +252,14 @@
           </tr>`;
       }).join('');
 
-      container.innerHTML = `
-        <table>
+      container.innerHTML = `<div class="table-scroll"><table>
           <thead>
             <tr>
-              <th>#</th><th>종목</th><th>시장</th><th>현재가</th><th>등락률</th><th>RSI</th><th>점수</th><th>시그널</th>
+              <th class="hide-mobile">#</th><th>종목</th><th class="hide-mobile">시장</th><th>현재가</th><th>등락률</th><th class="hide-mobile">RSI</th><th>점수</th><th class="hide-mobile">시그널</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
-        </table>`;
+        </table></div>`;
     }
 
     // 캐시된 결과 자동 로드

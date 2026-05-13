@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
-from data.fetcher import get_stock_ohlcv, get_stock_info, search_stocks
+from data.fetcher import get_stock_ohlcv, get_stock_info, search_stocks, get_stock_fundamental
 from data.indicators import add_all_indicators
 import math
 
@@ -49,6 +49,9 @@ async def get_stock(code: str, period: int = Query(365, ge=30, le=1825)):
     change_pct = (change / prev_close * 100) if prev_close else 0
     rsi_val = latest["rsi"]
 
+    high_52w = int(df["high"].max())
+    low_52w = int(df["low"].min())
+
     return {
         "info": info,
         "summary": {
@@ -57,6 +60,13 @@ async def get_stock(code: str, period: int = Query(365, ge=30, le=1825)):
             "change_pct": round(float(change_pct), 2),
             "volume": int(latest["volume"]),
             "rsi": round(float(rsi_val), 2) if (rsi_val is not None and not math.isnan(float(rsi_val))) else None,
+            "high_52w": high_52w,
+            "low_52w": low_52w,
         },
         "ohlcv": records,
     }
+
+
+@router.get("/{code}/fundamental")
+async def get_fundamental(code: str):
+    return get_stock_fundamental(code)

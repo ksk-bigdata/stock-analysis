@@ -29,6 +29,16 @@
       <div class="loading"><div class="spinner"></div></div>
     </div>
 
+    <!-- 기본정보 바 -->
+    <div class="fundamental-bar" id="fundamental-bar" style="display:none">
+      <div class="fundamental-item"><div class="fundamental-label">시가총액</div><div class="fundamental-value" id="f-mktcap">-</div></div>
+      <div class="fundamental-item"><div class="fundamental-label">PER</div><div class="fundamental-value" id="f-per">-</div></div>
+      <div class="fundamental-item"><div class="fundamental-label">PBR</div><div class="fundamental-value" id="f-pbr">-</div></div>
+      <div class="fundamental-item"><div class="fundamental-label">배당수익률</div><div class="fundamental-value" id="f-div">-</div></div>
+      <div class="fundamental-item"><div class="fundamental-label">52주 최고</div><div class="fundamental-value up" id="f-high">-</div></div>
+      <div class="fundamental-item"><div class="fundamental-label">52주 최저</div><div class="fundamental-value down" id="f-low">-</div></div>
+    </div>
+
     <!-- 차트 -->
     <div class="card" style="margin-bottom:16px">
       <div class="flex" style="align-items:center; justify-content:space-between; margin-bottom:12px">
@@ -372,6 +382,20 @@
       } catch(e) {
         console.error('차트 렌더링 오류:', e);
       }
+      // 52주 고/저 즉시 표시
+      const { high_52w, low_52w } = json.summary;
+      document.getElementById('f-high').textContent = high_52w ? high_52w.toLocaleString() + '원' : '-';
+      document.getElementById('f-low').textContent = low_52w ? low_52w.toLocaleString() + '원' : '-';
+      document.getElementById('fundamental-bar').style.display = 'flex';
+
+      // 기본정보(PER/PBR 등) 비동기 로드
+      fetch(`${BASE}/api/stocks/${CODE}/fundamental`).then(r => r.json()).then(f => {
+        document.getElementById('f-mktcap').textContent = f.market_cap ? (f.market_cap / 1e12).toFixed(1) + '조' : '-';
+        document.getElementById('f-per').textContent = f.per ? f.per + '배' : '-';
+        document.getElementById('f-pbr').textContent = f.pbr ? f.pbr + '배' : '-';
+        document.getElementById('f-div').textContent = f.div ? f.div + '%' : '-';
+      }).catch(() => {});
+
       // 2년 데이터 백그라운드 로드
       fetch(`${BASE}/api/stocks/${CODE}?period=730`).then(r => r.json()).then(j => { allData = j.ohlcv; });
     }
