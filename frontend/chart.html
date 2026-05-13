@@ -64,6 +64,12 @@
           <button class="btn btn-outline active" id="tab-vol" onclick="toggleVol(this)">거래량</button>
         </div>
       </div>
+      <div id="chart-legend" style="display:flex;gap:14px;padding:6px 4px 4px;font-size:12px;flex-wrap:wrap">
+        <span><span style="display:inline-block;width:22px;height:2px;background:#f0b429;vertical-align:middle;margin-right:4px"></span>MA5</span>
+        <span><span style="display:inline-block;width:22px;height:2px;background:#3fb950;vertical-align:middle;margin-right:4px"></span>MA20</span>
+        <span><span style="display:inline-block;width:22px;height:2px;background:#a371f7;vertical-align:middle;margin-right:4px"></span>MA60</span>
+        <span style="margin-left:6px"><span style="display:inline-block;width:22px;height:2px;background:rgba(56,139,253,.7);vertical-align:middle;margin-right:4px;border-top:2px dashed rgba(56,139,253,.6)"></span>볼린저밴드</span>
+      </div>
       <div id="chart-container"></div>
     </div>
 
@@ -284,11 +290,16 @@
     function toggleMA(btn) {
       showMA = !showMA;
       btn.classList.toggle('active', showMA);
+      document.querySelectorAll('#chart-legend span:nth-child(-n+3)').forEach(el => {
+        el.style.opacity = showMA ? '1' : '0.3';
+      });
       renderCharts(sliceData(currentPeriod));
     }
     function toggleBB(btn) {
       showBB = !showBB;
       btn.classList.toggle('active', showBB);
+      const bbLegend = document.querySelector('#chart-legend span:last-child');
+      if (bbLegend) bbLegend.style.opacity = showBB ? '1' : '0.3';
       renderCharts(sliceData(currentPeriod));
     }
     function toggleVol(btn) {
