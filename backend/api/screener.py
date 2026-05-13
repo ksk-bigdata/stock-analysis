@@ -272,20 +272,49 @@ async def ma60_status():
     }
 
 
+def _safe_float(v):
+    import math
+    try:
+        f = float(v)
+        return None if (math.isnan(f) or math.isinf(f)) else round(f, 2)
+    except Exception:
+        return None
+
+
 @router.get("/ma60/results")
 async def ma60_results(
-    filter: str = Query("all"),   # "all" | "new_cross" (신규 돌파만)
+    scope: str = Query("all"),   # "all" | "new_cross"
     market: str = Query("ALL"),
     min_streak: int = Query(2),
 ):
-    if _ma60_cache["data"] is None:
-        return {"status": _ma60_cache["status"], "results": []}
+    try:
+        if _ma60_cache["data"] is None:
+            return {"status": _ma60_cache["status"], "results": []}
 
-    data = _ma60_cache["data"]
-    if market != "ALL":
-        data = [d for d in data if d["market"] == market]
-    if filter == "new_cross":
-        data = [d for d in data if d["is_new_cross"]]
-    data = [d for d in data if d["streak"] >= min_streak]
+        data = _ma60_cache["data"]
+        if market != "ALL":
+            data = [d for d in data if d["market"] == market]
+        if scope == "new_cross":
+            data = [d for d in data if d["is_new_cross"]]
+        data = [d for d in data if d["streak"] >= min_streak]
 
-    return {"status": "done", "total": len(data), "results": data}
+        # 직렬화 안전하게 정제
+        clean = []
+        for r in data:
+            clean.append({
+                "code": str(r["code"]),
+                "name": str(r["name"]),
+                "market": str(r["market"]),
+                "close": int(r["close"]),
+                "ma60": _safe_float(r["ma60"]),
+                "gap_pct": _safe_float(r["gap_pct"]),
+                "streak": int(r["streak"]),
+                "is_new_cross": bool(r["is_new_cross"]),
+                "change_pct": _safe_float(r["change_pct"]),
+                "volume": int(r["volume"]),
+            })
+
+        return {"status": "done", "total": len(clean), "results": clean}
+    except Exception as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=str(e))

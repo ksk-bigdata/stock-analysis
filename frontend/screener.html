@@ -405,7 +405,7 @@
     }
 
     async function fetchMA60Results() {
-      const res = await fetch(`${BASE}/api/screener/ma60/results?filter=${ma60Filter}&market=${ma60Market}`);
+      const res = await fetch(`${BASE}/api/screener/ma60/results?scope=${ma60Filter}&market=${ma60Market}&_=${Date.now()}`);
       const data = await res.json();
       renderMA60Results(data.results || []);
       document.getElementById('ma60-status-text').textContent = `${(data.results || []).length}개 종목 탐지`;
