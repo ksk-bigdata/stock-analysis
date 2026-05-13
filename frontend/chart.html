@@ -523,5 +523,23 @@
     init();
   </script>
   <script src="/static/js/auth.js"></script>
+  <script>
+    document.querySelectorAll('.fi-tip').forEach(function(tip) {
+      var box = tip.querySelector('.fi-tip-box');
+      tip.addEventListener('mouseenter', function() {
+        var rect = tip.getBoundingClientRect();
+        box.style.display = 'block';
+        var boxW = box.offsetWidth;
+        var left = rect.left + rect.width / 2 - boxW / 2;
+        // 화면 밖으로 나가지 않도록 보정
+        left = Math.max(8, Math.min(left, window.innerWidth - boxW - 8));
+        box.style.left = left + 'px';
+        box.style.top = (rect.top - box.offsetHeight - 10) + 'px';
+      });
+      tip.addEventListener('mouseleave', function() {
+        box.style.display = 'none';
+      });
+    });
+  </script>
 </body>
 </html>
