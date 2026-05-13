@@ -1,11 +1,11 @@
 const API = 'https://stock-analysis-i3xj.onrender.com';
 
 async function checkAuth() {
-  const token = localStorage.getItem('kr_stock_token');
+  const token = sessionStorage.getItem('kr_stock_token');
   if (!token) { showLogin(); return; }
   try {
     const res = await fetch(`${API}/api/auth/verify?token=${token}`);
-    if (!res.ok) { localStorage.removeItem('kr_stock_token'); showLogin(); }
+    if (!res.ok) { sessionStorage.removeItem('kr_stock_token'); showLogin(); }
   } catch {
     showLogin();
   }
@@ -38,7 +38,7 @@ async function submitLogin() {
     });
     if (res.ok) {
       const { token } = await res.json();
-      localStorage.setItem('kr_stock_token', token);
+      sessionStorage.setItem('kr_stock_token', token);
       hideLogin();
     } else {
       errEl.textContent = '비밀번호가 틀렸습니다';
