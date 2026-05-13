@@ -41,12 +41,30 @@
 
     <!-- 기본정보 바 -->
     <div class="fundamental-bar" id="fundamental-bar" style="display:none">
-      <div class="fundamental-item"><div class="fundamental-label">시가총액</div><div class="fundamental-value" id="f-mktcap">-</div></div>
-      <div class="fundamental-item"><div class="fundamental-label">PER</div><div class="fundamental-value" id="f-per">-</div></div>
-      <div class="fundamental-item"><div class="fundamental-label">PBR</div><div class="fundamental-value" id="f-pbr">-</div></div>
-      <div class="fundamental-item"><div class="fundamental-label">배당수익률</div><div class="fundamental-value" id="f-div">-</div></div>
-      <div class="fundamental-item"><div class="fundamental-label">52주 최고</div><div class="fundamental-value up" id="f-high">-</div></div>
-      <div class="fundamental-item"><div class="fundamental-label">52주 최저</div><div class="fundamental-value down" id="f-low">-</div></div>
+      <div class="fundamental-item">
+        <div class="fundamental-label">시가총액<span class="fi-tip">ⓘ<span class="fi-tip-box">회사의 총 시장 가치입니다.<br>주가 × 발행 주식 수로 계산하며, 회사 규모를 나타냅니다.</span></span></div>
+        <div class="fundamental-value" id="f-mktcap">-</div>
+      </div>
+      <div class="fundamental-item">
+        <div class="fundamental-label">PER<span class="fi-tip">ⓘ<span class="fi-tip-box"><b>주가수익비율</b><br>현재 주가 ÷ 주당 순이익(EPS)<br>낮을수록 이익 대비 주가가 저렴한 편이며, 같은 업종과 비교하는 것이 중요합니다.</span></span></div>
+        <div class="fundamental-value" id="f-per">-</div>
+      </div>
+      <div class="fundamental-item">
+        <div class="fundamental-label">PBR<span class="fi-tip">ⓘ<span class="fi-tip-box"><b>주가순자산비율</b><br>현재 주가 ÷ 주당 순자산(BPS)<br>1배 미만이면 장부상 자산보다 주가가 낮은 상태로, 저평가 신호일 수 있습니다.</span></span></div>
+        <div class="fundamental-value" id="f-pbr">-</div>
+      </div>
+      <div class="fundamental-item">
+        <div class="fundamental-label">배당수익률<span class="fi-tip">ⓘ<span class="fi-tip-box"><b>배당수익률</b><br>연간 배당금 ÷ 현재 주가 × 100<br>주식을 보유했을 때 배당으로 받을 수 있는 수익률로, 높을수록 배당 매력이 큽니다.</span></span></div>
+        <div class="fundamental-value" id="f-div">-</div>
+      </div>
+      <div class="fundamental-item">
+        <div class="fundamental-label">52주 최고<span class="fi-tip">ⓘ<span class="fi-tip-box">최근 1년(52주)간 기록한 가장 높은 주가입니다.<br>현재가와 비교해 고점 대비 얼마나 하락했는지 파악할 수 있습니다.</span></span></div>
+        <div class="fundamental-value up" id="f-high">-</div>
+      </div>
+      <div class="fundamental-item">
+        <div class="fundamental-label">52주 최저<span class="fi-tip">ⓘ<span class="fi-tip-box">최근 1년(52주)간 기록한 가장 낮은 주가입니다.<br>현재가가 52주 저점에 가까울수록 역사적 저점 매수 기회일 수 있습니다.</span></span></div>
+        <div class="fundamental-value down" id="f-low">-</div>
+      </div>
     </div>
 
     <!-- 차트 -->
