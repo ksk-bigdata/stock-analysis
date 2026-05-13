@@ -1,11 +1,12 @@
 import FinanceDataReader as fdr
 import pandas as pd
 from datetime import datetime, timedelta
-from functools import lru_cache
 import time
 
 _stock_list_cache = {"data": None, "timestamp": 0}
-CACHE_TTL = 3600  # 1시간
+_ohlcv_cache = {}
+CACHE_TTL = 3600
+OHLCV_CACHE_TTL = 1800  # 30분
 
 
 def get_krx_stock_list() -> pd.DataFrame:
@@ -26,6 +27,13 @@ def search_stocks(query: str) -> list[dict]:
 
 
 def get_stock_ohlcv(code: str, period_days: int = 365) -> pd.DataFrame:
+    cache_key = f"{code}_{period_days}"
+    now = time.time()
+    if cache_key in _ohlcv_cache:
+        cached_df, cached_at = _ohlcv_cache[cache_key]
+        if now - cached_at < OHLCV_CACHE_TTL:
+            return cached_df
+
     end = datetime.today()
     start = end - timedelta(days=period_days)
     df = fdr.DataReader(code, start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d"))
@@ -34,7 +42,9 @@ def get_stock_ohlcv(code: str, period_days: int = 365) -> pd.DataFrame:
     df = df.rename(columns={"date": "date", "open": "open", "high": "high",
                              "low": "low", "close": "close", "volume": "volume"})
     df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
-    return df[["date", "open", "high", "low", "close", "volume"]].dropna()
+    result = df[["date", "open", "high", "low", "close", "volume"]].dropna()
+    _ohlcv_cache[cache_key] = (result, now)
+    return result
 
 
 def get_stock_info(code: str) -> dict:

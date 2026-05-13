@@ -329,7 +329,7 @@
 
     async function init() {
       initCharts();
-      const res = await fetch(`${BASE}/api/stocks/${CODE}?period=730`);
+      const res = await fetch(`${BASE}/api/stocks/${CODE}?period=365`);
       if (!res.ok) { alert('종목 데이터를 불러오지 못했습니다.'); return; }
       const json = await res.json();
       allData = json.ohlcv;
@@ -337,6 +337,8 @@
       const sliced = sliceData(currentPeriod);
       renderCharts(sliced);
       renderSignalsAndScore(sliced);
+      // 2년 데이터 백그라운드 로드
+      fetch(`${BASE}/api/stocks/${CODE}?period=730`).then(r => r.json()).then(j => { allData = j.ohlcv; });
     }
 
     init();
