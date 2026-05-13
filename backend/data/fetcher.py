@@ -63,31 +63,53 @@ def get_stock_fundamental(code: str) -> dict:
         data, ts = _fundamental_cache[code]
         if now - ts < FUNDAMENTAL_CACHE_TTL:
             return data
+
+    result = {}
     try:
-        from pykrx import stock as pykrx_stock
-        result = {}
-        for days_back in range(0, 5):
-            date = (datetime.today() - timedelta(days=days_back)).strftime("%Y%m%d")
+        import httpx, re
+        from bs4 import BeautifulSoup
+
+        url = f"https://finance.naver.com/item/main.naver?code={code}"
+        r = httpx.get(url, headers=_NAVER_HEADERS, timeout=10)
+        soup = BeautifulSoup(r.text, "html.parser")
+
+        def safe_float(el_id):
+            el = soup.select_one(f"em#{el_id}")
+            if not el:
+                return None
+            txt = re.sub(r"[^\d.]", "", el.get_text(strip=True))
             try:
-                df_f = pykrx_stock.get_market_fundamental(date, date, code)
-                df_c = pykrx_stock.get_market_cap(date, date, code)
-                if not df_f.empty:
-                    r = df_f.iloc[-1]
-                    result['per'] = round(float(r['PER']), 2) if r.get('PER', 0) != 0 else None
-                    result['pbr'] = round(float(r['PBR']), 2) if r.get('PBR', 0) != 0 else None
-                    result['div'] = round(float(r['DIV']), 2) if r.get('DIV', 0) != 0 else None
-                    result['eps'] = int(r['EPS']) if r.get('EPS', 0) != 0 else None
-                if not df_c.empty:
-                    r = df_c.iloc[-1]
-                    result['market_cap'] = int(r['시가총액']) if r.get('시가총액', 0) != 0 else None
-                if result:
-                    break
+                v = float(txt)
+                return v if v != 0 else None
             except Exception:
-                continue
-        _fundamental_cache[code] = (result, now)
-        return result
+                return None
+
+        result['per'] = safe_float('_per')
+        result['pbr'] = safe_float('_pbr')
+        result['div'] = safe_float('_dvr')
+
+        # 시가총액: "1,660조" → 억원 단위로 저장
+        mkt_el = soup.select_one("em#_market_sum")
+        if mkt_el:
+            raw = ""
+            for node in mkt_el.contents:
+                s = str(node).strip()
+                if s:
+                    raw = s
+                    break
+            raw = re.sub(r"[^\d조억]", "", raw)
+            if "조" in raw:
+                num = float(re.sub(r"[^\d]", "", raw.split("조")[0]) or 0)
+                result['market_cap'] = int(num * 1e12)
+            elif "억" in raw:
+                num = float(re.sub(r"[^\d]", "", raw.split("억")[0]) or 0)
+                result['market_cap'] = int(num * 1e8)
+
     except Exception:
-        return {}
+        pass
+
+    _fundamental_cache[code] = (result, now)
+    return result
 
 
 _smart_money_cache = {"data": None, "timestamp": 0}
