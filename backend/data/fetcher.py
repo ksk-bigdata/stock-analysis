@@ -178,7 +178,7 @@ def _get_investor_data(code: str) -> dict | None:
         return None
 
 
-def get_smart_money_data(min_days: int = 5) -> list[dict]:
+def get_smart_money_data(min_days: int = 3) -> list[dict]:
     """외국인/기관이 min_days 이상 연속 순매수 중인 종목 반환"""
     import httpx
     from concurrent.futures import ThreadPoolExecutor, as_completed

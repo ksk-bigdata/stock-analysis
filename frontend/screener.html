@@ -563,7 +563,7 @@
       let data = smAllResults;
       if (smType === 'foreign') data = data.filter(d => d.foreign_streak >= 5);
       else if (smType === 'inst')    data = data.filter(d => d.inst_streak >= 5);
-      else if (smType === 'both')    data = data.filter(d => d.foreign_streak >= 5 && d.inst_streak >= 5);
+      else if (smType === 'both')    data = data.filter(d => d.foreign_streak >= 3 && d.inst_streak >= 3);
       renderSmResults(data);
       document.getElementById('sm-status-text').textContent = `${data.length}개 종목 탐지`;
     }
@@ -575,9 +575,9 @@
         return;
       }
       const rows = results.map((r, i) => {
-        const fBadge = r.foreign_streak >= 5
+        const fBadge = r.foreign_streak >= 3
           ? `<span class="signal-badge buy">외국인 ${r.foreign_streak}일</span>` : '';
-        const iBadge = r.inst_streak >= 5
+        const iBadge = r.inst_streak >= 3
           ? `<span class="signal-badge neutral">기관 ${r.inst_streak}일</span>` : '';
         const fNet = r.foreign_net > 0
           ? `<span style="color:var(--red)">+${r.foreign_net}억</span>`
