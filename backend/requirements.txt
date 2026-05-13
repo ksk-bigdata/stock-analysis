@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+finance-datareader
+pykrx
+pandas
+numpy
+ta
+python-dotenv
+httpx

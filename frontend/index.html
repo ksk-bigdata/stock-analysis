@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KR Stock — 국내 주식 분석</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav>
+    <a class="nav-logo" href="/">KR Stock</a>
+    <div class="nav-links">
+      <a href="/" class="active">홈</a>
+      <a href="/screener">종목 추천</a>
+    </div>
+    <div class="search-bar">
+      <div class="search-wrapper">
+        <input id="nav-search" type="text" placeholder="종목명 또는 코드 검색">
+        <div class="search-dropdown" id="nav-dropdown"></div>
+      </div>
+      <button onclick="navSearch()">검색</button>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <h1>국내 주식 분석</h1>
+    <p>기술적 분석 기반 종목 스크리닝 · 차트 분석 · 매수 시그널 탐지</p>
+    <div class="hero-search">
+      <div class="search-wrapper" style="flex:1">
+        <input id="hero-search" type="text" placeholder="삼성전자, 005930 ...">
+        <div class="search-dropdown" id="hero-dropdown"></div>
+      </div>
+      <button onclick="heroSearch()">분석하기</button>
+    </div>
+    <div class="popular-stocks" id="popular-stocks">
+      <div class="popular-chip" onclick="goToChart('005930')">삼성전자</div>
+      <div class="popular-chip" onclick="goToChart('000660')">SK하이닉스</div>
+      <div class="popular-chip" onclick="goToChart('035420')">NAVER</div>
+      <div class="popular-chip" onclick="goToChart('051910')">LG화학</div>
+      <div class="popular-chip" onclick="goToChart('006400')">삼성SDI</div>
+      <div class="popular-chip" onclick="goToChart('035720')">카카오</div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="section-title">
+      인기 종목
+      <a href="/screener" class="btn btn-outline" style="font-size:13px">종목 추천 보기 →</a>
+    </div>
+
+    <div id="popular-table">
+      <div class="loading"><div class="spinner"></div>데이터 로딩 중...</div>
+    </div>
+  </div>
+
+  <script>
+    const BASE = '';
+    const POPULAR = [
+      {code:'005930', name:'삼성전자'},
+      {code:'000660', name:'SK하이닉스'},
+      {code:'035420', name:'NAVER'},
+      {code:'051910', name:'LG화학'},
+      {code:'006400', name:'삼성SDI'},
+      {code:'035720', name:'카카오'},
+    ];
+
+    function goToChart(code) {
+      window.location.href = `/chart?code=${code}`;
+    }
+
+    // 검색 자동완성
+    function setupSearch(inputId, dropdownId, onSelect) {
+      const input = document.getElementById(inputId);
+      const dropdown = document.getElementById(dropdownId);
+      let timer;
+
+      input.addEventListener('input', () => {
+        clearTimeout(timer);
+        const q = input.value.trim();
+        if (!q) { dropdown.classList.remove('open'); return; }
+        timer = setTimeout(async () => {
+          const res = await fetch(`${BASE}/api/stocks/search?q=${encodeURIComponent(q)}`);
+          const data = await res.json();
+          if (!data.results.length) { dropdown.classList.remove('open'); return; }
+          dropdown.innerHTML = data.results.map(s => `
+            <div class="search-item" onclick="selectStock('${s.code}')">
+              <span>${s.name}</span>
+              <span class="code">${s.code} <span class="market-badge">${s.market}</span></span>
+            </div>
+          `).join('');
+          dropdown.classList.add('open');
+        }, 250);
+      });
+
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') onSelect(input.value.trim());
+      });
+
+      document.addEventListener('click', e => {
+        if (!e.target.closest('.search-wrapper')) dropdown.classList.remove('open');
+      });
+
+      window.selectStock = (code) => {
+        dropdown.classList.remove('open');
+        goToChart(code);
+      };
+    }
+
+    function navSearch() {
+      const v = document.getElementById('nav-search').value.trim();
+      if (v) goToChart(v);
+    }
+    function heroSearch() {
+      const v = document.getElementById('hero-search').value.trim();
+      if (v) goToChart(v);
+    }
+
+    setupSearch('nav-search', 'nav-dropdown', goToChart);
+    setupSearch('hero-search', 'hero-dropdown', goToChart);
+
+    // 인기 종목 테이블
+    async function loadPopular() {
+      const container = document.getElementById('popular-table');
+      const results = await Promise.allSettled(
+        POPULAR.map(s => fetch(`${BASE}/api/stocks/${s.code}?period=30`).then(r => r.json()))
+      );
+
+      const rows = results.map((r, i) => {
+        if (r.status !== 'fulfilled') return null;
+        const d = r.value;
+        const s = d.summary;
+        const sign = s.change >= 0 ? '+' : '';
+        const cls = s.change >= 0 ? 'up' : 'down';
+        return `
+          <tr onclick="goToChart('${d.info.code}')" style="cursor:pointer">
+            <td><div class="stock-name-cell"><span class="name">${d.info.name}</span><span class="code">${d.info.code}</span></div></td>
+            <td>${d.info.market}</td>
+            <td style="font-weight:600">${s.close.toLocaleString()}원</td>
+            <td class="${cls}">${sign}${s.change.toLocaleString()}원</td>
+            <td class="${cls}">${sign}${s.change_pct}%</td>
+            <td>${(s.volume / 1000).toFixed(0)}천주</td>
+            <td>${s.rsi ?? '-'}</td>
+          </tr>`;
+      }).filter(Boolean);
+
+      container.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>종목</th><th>시장</th><th>현재가</th><th>등락</th><th>등락률</th><th>거래량</th><th>RSI</th>
+            </tr>
+          </thead>
+          <tbody>${rows.join('')}</tbody>
+        </table>`;
+    }
+
+    loadPopular();
+  </script>
+</body>
+</html>
