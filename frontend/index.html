@@ -7,6 +7,16 @@
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
+  <div id="auth-overlay">
+    <div class="auth-box">
+      <h2>KR Stock</h2>
+      <p>비밀번호를 입력하세요</p>
+      <input id="auth-pw" type="password" placeholder="••••••••" autofocus>
+      <div id="auth-error"></div>
+      <button id="auth-btn" onclick="submitLogin()">입장</button>
+    </div>
+  </div>
+
   <nav>
     <a class="nav-logo" href="/">KR Stock</a>
     <div class="nav-links">
@@ -65,8 +75,9 @@
     </div>
   </div>
 
+  <script src="/static/js/auth.js"></script>
   <script>
-    const BASE = 'https://stock-analysis-i3xj.onrender.com';
+    const BASE = '';
     const POPULAR = [
       {code:'005930', name:'삼성전자'},
       {code:'000660', name:'SK하이닉스'},

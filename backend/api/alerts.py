@@ -4,13 +4,12 @@ import httpx
 import asyncio
 import time
 
+from db.client import get_supabase
+
 router = APIRouter()
 
 TELEGRAM_TOKEN = "8926379749:AAHT9N2eJF97FHQDz5Pu8FseT09Q9I3x8qU"
 TELEGRAM_CHAT_ID = "8288748039"
-
-# {code: {name, target, direction, set_at}}
-_alerts: dict = {}
 
 
 class AlertRequest(BaseModel):
@@ -26,18 +25,38 @@ async def send_telegram(message: str):
         await client.post(url, data={"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"})
 
 
+def _load_alerts() -> dict:
+    try:
+        sb = get_supabase()
+        result = sb.table("alerts").select("*").execute()
+        return {row["code"]: row for row in result.data}
+    except Exception:
+        return {}
+
+
+def _save_alert(alert: dict):
+    sb = get_supabase()
+    sb.table("alerts").upsert(alert).execute()
+
+
+def _delete_alert(code: str):
+    sb = get_supabase()
+    sb.table("alerts").delete().eq("code", code).execute()
+
+
 async def check_alerts_loop():
     from data.fetcher import get_stock_ohlcv
-    await asyncio.sleep(30)  # 서버 시작 후 30초 대기
+    await asyncio.sleep(30)
     while True:
+        alerts = _load_alerts()
         triggered = []
-        for code, alert in list(_alerts.items()):
+        for code, alert in alerts.items():
             try:
                 df = get_stock_ohlcv(code, period_days=5)
                 if df.empty:
                     continue
                 current = float(df.iloc[-1]["close"])
-                target = alert["target"]
+                target = float(alert["target"])
                 direction = alert["direction"]
                 hit = (direction == "above" and current >= target) or \
                       (direction == "below" and current <= target)
@@ -54,25 +73,31 @@ async def check_alerts_loop():
                 continue
 
         for code in triggered:
-            _alerts.pop(code, None)
+            _delete_alert(code)
 
-        await asyncio.sleep(600)  # 10분마다 체크
+        await asyncio.sleep(600)
 
 
 @router.get("")
 async def get_alerts():
-    return {"alerts": list(_alerts.values())}
+    alerts = _load_alerts()
+    return {"alerts": list(alerts.values())}
 
 
 @router.post("")
 async def set_alert(req: AlertRequest):
-    _alerts[req.code] = {
+    alert = {
         "code": req.code,
         "name": req.name,
         "target": req.target,
         "direction": req.direction,
         "set_at": time.time(),
     }
+    try:
+        _save_alert(alert)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"알림 저장 실패: {e}")
+
     arrow = "📈" if req.direction == "above" else "📉"
     await send_telegram(
         f"{arrow} <b>{req.name} ({req.code})</b> 알림 설정\n"
@@ -83,5 +108,5 @@ async def set_alert(req: AlertRequest):
 
 @router.delete("/{code}")
 async def delete_alert(code: str):
-    _alerts.pop(code, None)
+    _delete_alert(code)
     return {"status": "ok"}

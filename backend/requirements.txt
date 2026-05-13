@@ -7,3 +7,5 @@ numpy
 ta
 python-dotenv
 httpx
+supabase
+aiofiles
