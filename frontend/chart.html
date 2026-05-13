@@ -185,6 +185,15 @@
       bbMid = mainChart.addLineSeries({ color: 'rgba(56,139,253,.7)', lineWidth: 1, priceLineVisible: false });
       bbLower = mainChart.addLineSeries({ color: 'rgba(56,139,253,.5)', lineWidth: 1, priceLineVisible: false, lineStyle: 2 });
 
+      volSeries = mainChart.addHistogramSeries({
+        priceFormat: { type: 'volume' },
+        priceScaleId: 'vol',
+        priceLineVisible: false,
+      });
+      mainChart.priceScale('vol').applyOptions({
+        scaleMargins: { top: 0.8, bottom: 0 },
+      });
+
       // 보조 차트 (RSI/MACD)
       const indEl = document.getElementById('indicator-container');
       indChart = LightweightCharts.createChart(indEl, {
@@ -230,6 +239,16 @@
         bbUpper.setData([]); bbMid.setData([]); bbLower.setData([]);
       }
 
+      if (showVol) {
+        volSeries.setData(data.map((d, i) => ({
+          time: toTS(d.date),
+          value: d.volume,
+          color: i > 0 && d.close >= data[i - 1].close ? 'rgba(248,81,73,0.5)' : 'rgba(56,139,253,0.5)',
+        })));
+      } else {
+        volSeries.setData([]);
+      }
+
       renderIndicator(data);
       mainChart.timeScale().fitContent();
       indChart.timeScale().fitContent();
@@ -272,7 +291,11 @@
       btn.classList.toggle('active', showBB);
       renderCharts(sliceData(currentPeriod));
     }
-    function toggleVol(btn) { showVol = !showVol; btn.classList.toggle('active', showVol); }
+    function toggleVol(btn) {
+      showVol = !showVol;
+      btn.classList.toggle('active', showVol);
+      renderCharts(sliceData(currentPeriod));
+    }
 
     function showIndicator(type, btn) {
       currentIndicator = type;
