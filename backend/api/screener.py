@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Query, BackgroundTasks
-from data.fetcher import get_krx_stock_list, get_stock_ohlcv
+from data.fetcher import get_krx_stock_list, get_stock_ohlcv, get_smart_money_data
 from data.indicators import add_all_indicators, compute_score
 import pandas as pd
 import asyncio
@@ -110,3 +110,53 @@ async def screener_results(
         "total": len(data),
         "results": data[:limit],
     }
+
+
+_smart_money_task = {"status": "idle"}
+
+
+async def _run_smart_money():
+    _smart_money_task["status"] = "running"
+    try:
+        import asyncio
+        loop = asyncio.get_event_loop()
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=1) as ex:
+            await loop.run_in_executor(ex, get_smart_money_data)
+        _smart_money_task["status"] = "done"
+    except Exception as e:
+        _smart_money_task["status"] = f"error: {e}"
+
+
+@router.get("/smart-money/run")
+async def smart_money_run(background_tasks: BackgroundTasks):
+    if _smart_money_task["status"] == "running":
+        return {"status": "running"}
+    background_tasks.add_task(_run_smart_money)
+    return {"status": "started"}
+
+
+@router.get("/smart-money/status")
+async def smart_money_status():
+    return {"status": _smart_money_task["status"]}
+
+
+@router.get("/smart-money/results")
+async def smart_money_results(
+    type: str = Query("all"),   # "foreign" | "inst" | "both" | "all"
+    min_days: int = Query(5),
+):
+    from data.fetcher import _smart_money_cache
+    if _smart_money_cache["data"] is None:
+        return {"status": _smart_money_task["status"], "results": []}
+
+    data = _smart_money_cache["data"]
+
+    if type == "foreign":
+        data = [d for d in data if d["foreign_streak"] >= min_days]
+    elif type == "inst":
+        data = [d for d in data if d["inst_streak"] >= min_days]
+    elif type == "both":
+        data = [d for d in data if d["foreign_streak"] >= min_days and d["inst_streak"] >= min_days]
+
+    return {"status": "done", "total": len(data), "results": data}

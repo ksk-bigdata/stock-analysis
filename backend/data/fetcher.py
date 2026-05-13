@@ -90,6 +90,101 @@ def get_stock_fundamental(code: str) -> dict:
         return {}
 
 
+_smart_money_cache = {"data": None, "timestamp": 0}
+SMART_MONEY_CACHE_TTL = 1800
+
+
+def get_smart_money_data(min_days: int = 5) -> list[dict]:
+    """외국인/기관이 min_days 이상 연속 순매수 중인 종목 반환"""
+    now = time.time()
+    if _smart_money_cache["data"] is not None and now - _smart_money_cache["timestamp"] < SMART_MONEY_CACHE_TTL:
+        return _smart_money_cache["data"]
+
+    from pykrx import stock as pykrx_stock
+
+    # 최근 거래일 최대 10개 수집
+    foreign_daily: dict[str, dict] = {}  # date -> {code: net}
+    inst_daily: dict[str, dict] = {}
+
+    current = datetime.today()
+    dates_found = []
+    days_checked = 0
+
+    while len(dates_found) < 10 and days_checked < 30:
+        if current.weekday() < 5:
+            date_str = current.strftime("%Y%m%d")
+            try:
+                df_f = pykrx_stock.get_market_net_purchases_of_equities_by_ticker(
+                    date_str, date_str, "ALL", "외국인"
+                )
+                if df_f is not None and not df_f.empty and "순매수" in df_f.columns:
+                    foreign_daily[date_str] = df_f["순매수"].to_dict()
+                    try:
+                        df_i = pykrx_stock.get_market_net_purchases_of_equities_by_ticker(
+                            date_str, date_str, "ALL", "기관합계"
+                        )
+                        inst_daily[date_str] = df_i["순매수"].to_dict() if (df_i is not None and not df_i.empty and "순매수" in df_i.columns) else {}
+                    except Exception:
+                        inst_daily[date_str] = {}
+                    dates_found.append(date_str)
+            except Exception:
+                pass
+        current -= timedelta(days=1)
+        days_checked += 1
+
+    dates_found.sort()
+
+    # 전체 종목 코드 수집
+    all_codes: set[str] = set()
+    for d in foreign_daily.values():
+        all_codes.update(d.keys())
+
+    stock_list = get_krx_stock_list()
+    name_map = dict(zip(stock_list["code"], stock_list["name"]))
+    market_map = dict(zip(stock_list["code"], stock_list["market"]))
+
+    results = []
+    for code in all_codes:
+        # 최신 날짜부터 연속 순매수 일수 계산
+        f_streak = 0
+        for date in reversed(dates_found):
+            if foreign_daily.get(date, {}).get(code, 0) > 0:
+                f_streak += 1
+            else:
+                break
+
+        i_streak = 0
+        for date in reversed(dates_found):
+            if inst_daily.get(date, {}).get(code, 0) > 0:
+                i_streak += 1
+            else:
+                break
+
+        if f_streak < min_days and i_streak < min_days:
+            continue
+
+        # 최근 5일 누적 순매수금액 (억원)
+        recent = dates_found[-5:]
+        f_total = sum(foreign_daily.get(d, {}).get(code, 0) for d in recent)
+        i_total = sum(inst_daily.get(d, {}).get(code, 0) for d in recent)
+
+        results.append({
+            "code": code,
+            "name": name_map.get(code, code),
+            "market": market_map.get(code, ""),
+            "foreign_streak": f_streak,
+            "inst_streak": i_streak,
+            "foreign_net": round(f_total / 1e8, 1),   # 억원
+            "inst_net": round(i_total / 1e8, 1),
+        })
+
+    # 외국인+기관 연속일수 합산 내림차순
+    results.sort(key=lambda x: x["foreign_streak"] + x["inst_streak"], reverse=True)
+    _smart_money_cache["data"] = results
+    _smart_money_cache["timestamp"] = now
+    return results
+
+
 def get_all_stocks_for_screening(period_days: int = 120) -> dict[str, pd.DataFrame]:
     stock_list = get_krx_stock_list()
     result = {}
