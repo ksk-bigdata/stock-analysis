@@ -162,7 +162,8 @@
     }
 
     function toTS(dateStr) {
-      return Math.floor(new Date(dateStr).getTime() / 1000);
+      const [y, m, d] = dateStr.split('-').map(Number);
+      return { year: y, month: m, day: d };
     }
 
     function colorOf(v) { return v >= 0 ? '#f85149' : '#388bfd'; }

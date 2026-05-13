@@ -346,18 +346,29 @@
     let ma60Filter = 'all';
     let ma60Market = 'ALL';
     let ma60PollTimer;
+    let ma60AllResults = [];
+
+    function saveMA60Cache(results) {
+      sessionStorage.setItem('ma60_results', JSON.stringify(results));
+      sessionStorage.setItem('ma60_ts', Date.now());
+    }
+    function loadMA60Cache() {
+      const ts = sessionStorage.getItem('ma60_ts');
+      if (!ts || Date.now() - ts > 1800000) return null; // 30분 이상이면 무효
+      try { return JSON.parse(sessionStorage.getItem('ma60_results')); } catch { return null; }
+    }
 
     function filterMA60(f, btn) {
       ma60Filter = f;
       document.querySelectorAll('.ma60-filter-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      fetchMA60Results();
+      applyMA60Filter();
     }
     function filterMA60Market(m, btn) {
       ma60Market = m;
       document.querySelectorAll('.ma60-market-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      fetchMA60Results();
+      applyMA60Filter();
     }
 
     async function runMA60() {
@@ -405,10 +416,19 @@
     }
 
     async function fetchMA60Results() {
-      const res = await fetch(`${BASE}/api/screener/ma60/results?scope=${ma60Filter}&market=${ma60Market}&_=${Date.now()}`);
+      const res = await fetch(`${BASE}/api/screener/ma60/results?scope=all&_=${Date.now()}`);
       const data = await res.json();
-      renderMA60Results(data.results || []);
-      document.getElementById('ma60-status-text').textContent = `${(data.results || []).length}개 종목 탐지`;
+      ma60AllResults = data.results || [];
+      saveMA60Cache(ma60AllResults);
+      applyMA60Filter();
+    }
+
+    function applyMA60Filter() {
+      let data = ma60AllResults;
+      if (ma60Market !== 'ALL') data = data.filter(d => d.market === ma60Market);
+      if (ma60Filter === 'new_cross') data = data.filter(d => d.is_new_cross);
+      renderMA60Results(data);
+      document.getElementById('ma60-status-text').textContent = `${data.length}개 종목 탐지`;
     }
 
     function renderMA60Results(results) {
@@ -445,16 +465,47 @@
       </table></div>`;
     }
 
+    // 페이지 로드 시 MA60 캐시 복원
+    (() => {
+      const cached = loadMA60Cache();
+      if (cached && cached.length) {
+        ma60AllResults = cached;
+        applyMA60Filter();
+        document.getElementById('ma60-run-btn').textContent = '다시 탐지';
+      }
+    })();
+
     // ── 외국인/기관 순매수 ──────────────────────────────
     let smType = 'all';
     let smPollTimer;
+    let smAllResults = [];
+
+    function saveSmCache(results) {
+      sessionStorage.setItem('sm_results', JSON.stringify(results));
+      sessionStorage.setItem('sm_ts', Date.now());
+    }
+    function loadSmCache() {
+      const ts = sessionStorage.getItem('sm_ts');
+      if (!ts || Date.now() - ts > 1800000) return null;
+      try { return JSON.parse(sessionStorage.getItem('sm_results')); } catch { return null; }
+    }
 
     function filterSmType(type, btn) {
       smType = type;
       document.querySelectorAll('.sm-type-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      fetchSmResults();
+      applySmFilter();
     }
+
+    // 페이지 로드 시 스마트머니 캐시 복원
+    (() => {
+      const cached = loadSmCache();
+      if (cached && cached.length) {
+        smAllResults = cached;
+        applySmFilter();
+        document.getElementById('sm-run-btn').textContent = '다시 탐지';
+      }
+    })();
 
     async function runSmartMoney() {
       const btn = document.getElementById('sm-run-btn');
@@ -480,10 +531,20 @@
     }
 
     async function fetchSmResults() {
-      const res = await fetch(`${BASE}/api/screener/smart-money/results?type=${smType}`);
+      const res = await fetch(`${BASE}/api/screener/smart-money/results?type=all&_=${Date.now()}`);
       const data = await res.json();
-      renderSmResults(data.results || []);
-      document.getElementById('sm-status-text').textContent = `${(data.results || []).length}개 종목 탐지`;
+      smAllResults = data.results || [];
+      saveSmCache(smAllResults);
+      applySmFilter();
+    }
+
+    function applySmFilter() {
+      let data = smAllResults;
+      if (smType === 'foreign') data = data.filter(d => d.foreign_streak >= 5);
+      else if (smType === 'inst')    data = data.filter(d => d.inst_streak >= 5);
+      else if (smType === 'both')    data = data.filter(d => d.foreign_streak >= 5 && d.inst_streak >= 5);
+      renderSmResults(data);
+      document.getElementById('sm-status-text').textContent = `${data.length}개 종목 탐지`;
     }
 
     function renderSmResults(results) {
