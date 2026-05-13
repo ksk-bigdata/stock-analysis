@@ -124,20 +124,21 @@
       document.getElementById('progress-bar').style.display = 'block';
       animateProgress();
 
-      const res = await fetch(`${BASE}/api/screener/run?top_n=200`);
+      const res = await fetch(`${BASE}/api/screener/run?top_n=50`);
       const data = await res.json();
       if (data.status === 'done') {
         await fetchResults();
       } else {
         pollTimer = setInterval(async () => {
           const st = await fetch(`${BASE}/api/screener/status`).then(r => r.json());
-          document.getElementById('status-text').textContent = `분석 중... (${st.count}개 처리됨)`;
+          const pct = st.total > 0 ? Math.round(st.progress / st.total * 100) : 0;
+          document.getElementById('status-text').textContent = `분석 중... ${st.progress}/${st.total}개 (${pct}%)`;
           if (st.status === 'done') {
             clearInterval(pollTimer);
             await fetchResults();
             resetBtn();
           }
-        }, 2000);
+        }, 1500);
       }
     }
 
