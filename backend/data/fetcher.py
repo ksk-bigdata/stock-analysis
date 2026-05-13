@@ -93,92 +93,120 @@ def get_stock_fundamental(code: str) -> dict:
 _smart_money_cache = {"data": None, "timestamp": 0}
 SMART_MONEY_CACHE_TTL = 1800
 
+_NAVER_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+
+
+def _get_candidate_codes() -> set[str]:
+    """네이버 증권 거래량 상위에서 종목코드 수집 (KOSPI+KOSDAQ)"""
+    import httpx, re
+    from bs4 import BeautifulSoup
+
+    codes: set[str] = set()
+    for sosok in ("0", "1"):
+        for page in range(1, 4):
+            try:
+                url = f"https://finance.naver.com/sise/sise_quant.naver?sosok={sosok}&page={page}"
+                r = httpx.get(url, headers=_NAVER_HEADERS, timeout=10)
+                soup = BeautifulSoup(r.text, "html.parser")
+                for a in soup.find_all("a", href=True):
+                    m = re.search(r"code=(\d{6})", a["href"])
+                    if m:
+                        codes.add(m.group(1))
+            except Exception:
+                continue
+    return codes
+
+
+def _get_investor_data(code: str) -> dict | None:
+    """네이버 frgn.naver에서 외국인/기관 일별 순매수 파싱"""
+    import httpx, re
+    from bs4 import BeautifulSoup
+
+    try:
+        url = f"https://finance.naver.com/item/frgn.naver?code={code}"
+        r = httpx.get(url, headers=_NAVER_HEADERS, timeout=10)
+        soup = BeautifulSoup(r.text, "html.parser")
+        tables = soup.find_all("table")
+
+        # 기관/외국인 컬럼이 있는 테이블 탐색
+        target_table = None
+        for t in tables:
+            headers = [th.get_text(strip=True) for th in t.find_all("th")]
+            if "기관" in headers and "외국인" in headers:
+                target_table = t
+                break
+        if target_table is None:
+            return None
+        rows = target_table.find_all("tr")
+
+        def parse_num(s: str) -> int:
+            s = s.replace(",", "").replace("+", "")
+            try:
+                return int(s)
+            except Exception:
+                return 0
+
+        records = []
+        for row in rows:
+            cols = [td.get_text(strip=True) for td in row.find_all("td")]
+            if len(cols) >= 7 and re.match(r"\d{4}\.\d{2}\.\d{2}", cols[0]):
+                records.append({"inst": parse_num(cols[5]), "foreign": parse_num(cols[6])})
+
+        if not records:
+            return None
+
+        f_streak = i_streak = 0
+        for rec in records:
+            if rec["foreign"] > 0:
+                f_streak += 1
+            else:
+                break
+        for rec in records:
+            if rec["inst"] > 0:
+                i_streak += 1
+            else:
+                break
+
+        # 최근 5일 누적 (억원)
+        recent = records[:5]
+        f_net = round(sum(r["foreign"] for r in recent) / 1e4, 1)  # 억원
+        i_net = round(sum(r["inst"] for r in recent) / 1e4, 1)
+
+        return {"foreign_streak": f_streak, "inst_streak": i_streak,
+                "foreign_net": f_net, "inst_net": i_net}
+    except Exception:
+        return None
+
 
 def get_smart_money_data(min_days: int = 5) -> list[dict]:
     """외국인/기관이 min_days 이상 연속 순매수 중인 종목 반환"""
+    import httpx
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
     now = time.time()
     if _smart_money_cache["data"] is not None and now - _smart_money_cache["timestamp"] < SMART_MONEY_CACHE_TTL:
         return _smart_money_cache["data"]
-
-    from pykrx import stock as pykrx_stock
-
-    # 최근 거래일 최대 10개 수집
-    foreign_daily: dict[str, dict] = {}  # date -> {code: net}
-    inst_daily: dict[str, dict] = {}
-
-    current = datetime.today()
-    dates_found = []
-    days_checked = 0
-
-    while len(dates_found) < 10 and days_checked < 30:
-        if current.weekday() < 5:
-            date_str = current.strftime("%Y%m%d")
-            try:
-                df_f = pykrx_stock.get_market_net_purchases_of_equities_by_ticker(
-                    date_str, date_str, "ALL", "외국인"
-                )
-                if df_f is not None and not df_f.empty and "순매수" in df_f.columns:
-                    foreign_daily[date_str] = df_f["순매수"].to_dict()
-                    try:
-                        df_i = pykrx_stock.get_market_net_purchases_of_equities_by_ticker(
-                            date_str, date_str, "ALL", "기관합계"
-                        )
-                        inst_daily[date_str] = df_i["순매수"].to_dict() if (df_i is not None and not df_i.empty and "순매수" in df_i.columns) else {}
-                    except Exception:
-                        inst_daily[date_str] = {}
-                    dates_found.append(date_str)
-            except Exception:
-                pass
-        current -= timedelta(days=1)
-        days_checked += 1
-
-    dates_found.sort()
-
-    # 전체 종목 코드 수집
-    all_codes: set[str] = set()
-    for d in foreign_daily.values():
-        all_codes.update(d.keys())
 
     stock_list = get_krx_stock_list()
     name_map = dict(zip(stock_list["code"], stock_list["name"]))
     market_map = dict(zip(stock_list["code"], stock_list["market"]))
 
+    candidates = _get_candidate_codes()
+
     results = []
-    for code in all_codes:
-        # 최신 날짜부터 연속 순매수 일수 계산
-        f_streak = 0
-        for date in reversed(dates_found):
-            if foreign_daily.get(date, {}).get(code, 0) > 0:
-                f_streak += 1
-            else:
-                break
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        future_map = {executor.submit(_get_investor_data, code): code for code in candidates}
+        for future in as_completed(future_map):
+            code = future_map[future]
+            data = future.result()
+            if data and (data["foreign_streak"] >= min_days or data["inst_streak"] >= min_days):
+                results.append({
+                    "code": code,
+                    "name": name_map.get(code, code),
+                    "market": market_map.get(code, ""),
+                    **data,
+                })
 
-        i_streak = 0
-        for date in reversed(dates_found):
-            if inst_daily.get(date, {}).get(code, 0) > 0:
-                i_streak += 1
-            else:
-                break
-
-        if f_streak < min_days and i_streak < min_days:
-            continue
-
-        # 최근 5일 누적 순매수금액 (억원)
-        recent = dates_found[-5:]
-        f_total = sum(foreign_daily.get(d, {}).get(code, 0) for d in recent)
-        i_total = sum(inst_daily.get(d, {}).get(code, 0) for d in recent)
-
-        results.append({
-            "code": code,
-            "name": name_map.get(code, code),
-            "market": market_map.get(code, ""),
-            "foreign_streak": f_streak,
-            "inst_streak": i_streak,
-            "foreign_net": round(f_total / 1e8, 1),   # 억원
-            "inst_net": round(i_total / 1e8, 1),
-        })
-
-    # 외국인+기관 연속일수 합산 내림차순
     results.sort(key=lambda x: x["foreign_streak"] + x["inst_streak"], reverse=True)
     _smart_money_cache["data"] = results
     _smart_money_cache["timestamp"] = now
