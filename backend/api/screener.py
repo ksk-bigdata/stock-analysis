@@ -57,7 +57,10 @@ async def _run_screening(top_n: int = 50):
 
     results = []
     for coro in asyncio.as_completed(tasks):
-        result = await coro
+        try:
+            result = await asyncio.wait_for(coro, timeout=20)
+        except asyncio.TimeoutError:
+            result = None
         _screener_cache["progress"] += 1
         if result:
             results.append(result)
@@ -234,7 +237,10 @@ async def _run_ma60_screener(top_n: int):
 
         results = []
         for coro in asyncio.as_completed(tasks):
-            result = await coro
+            try:
+                result = await asyncio.wait_for(coro, timeout=20)
+            except asyncio.TimeoutError:
+                result = None
             _ma60_cache["progress"] += 1
             if result:
                 results.append(result)
