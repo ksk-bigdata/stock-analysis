@@ -79,6 +79,29 @@
     </div>
   </div>
 
+  <!-- 알림 모달 -->
+  <div id="alert-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center">
+    <div class="card" style="width:340px;padding:24px">
+      <div style="font-size:16px;font-weight:700;margin-bottom:16px">🔔 가격 알림 설정</div>
+      <div style="margin-bottom:12px">
+        <div class="stat-label" style="margin-bottom:6px">알림 조건</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline active" id="dir-above" onclick="setDir('above',this)">📈 이상</button>
+          <button class="btn btn-outline" id="dir-below" onclick="setDir('below',this)">📉 이하</button>
+        </div>
+      </div>
+      <div style="margin-bottom:20px">
+        <div class="stat-label" style="margin-bottom:6px">목표가 (원)</div>
+        <input id="alert-price" type="number" placeholder="목표 가격 입력"
+          style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px 12px;font-size:15px;outline:none">
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" style="flex:1" onclick="submitAlert()">설정</button>
+        <button class="btn btn-outline" onclick="closeAlertModal()">취소</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const BASE = 'https://stock-analysis-i3xj.onrender.com';
     const params = new URLSearchParams(location.search);
@@ -272,6 +295,7 @@
     }
 
     function renderHeader(info, summary) {
+      currentInfo = info;
       const sign = summary.change >= 0 ? '+' : '';
       const cls = summary.change >= 0 ? 'up' : 'down';
       document.title = `${info.name} — KR Stock`;
@@ -282,6 +306,7 @@
         </div>
         <div style="margin-left:auto;text-align:right;display:flex;align-items:center;gap:12px">
           <button id="watch-btn" class="btn btn-outline" onclick="toggleWatchlist('${info.code}','${info.name}')" style="font-size:13px">☆ 관심종목</button>
+          <button class="btn btn-outline" onclick="openAlertModal()" style="font-size:13px">🔔 가격 알림</button>
           <div>
             <div class="stat-value ${cls}">${summary.close.toLocaleString()}원</div>
             <div class="stat-change ${cls}">${sign}${summary.change.toLocaleString()} (${sign}${summary.change_pct}%)</div>
@@ -399,6 +424,37 @@
       // 2년 데이터 백그라운드 로드
       fetch(`${BASE}/api/stocks/${CODE}?period=730`).then(r => r.json()).then(j => { allData = j.ohlcv; });
     }
+
+    // 가격 알림
+    let alertDirection = 'above';
+    let currentInfo = null;
+    function setDir(dir, btn) {
+      alertDirection = dir;
+      document.getElementById('dir-above').classList.toggle('active', dir === 'above');
+      document.getElementById('dir-below').classList.toggle('active', dir === 'below');
+    }
+    function openAlertModal() {
+      document.getElementById('alert-modal').style.display = 'flex';
+    }
+    function closeAlertModal() {
+      document.getElementById('alert-modal').style.display = 'none';
+    }
+    async function submitAlert() {
+      const price = parseFloat(document.getElementById('alert-price').value);
+      if (!price || !currentInfo) return;
+      const res = await fetch(`${BASE}/api/alerts`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({code: currentInfo.code, name: currentInfo.name, target: price, direction: alertDirection})
+      });
+      if (res.ok) {
+        closeAlertModal();
+        alert(`✅ 알림 설정 완료!\n텔레그램으로 알림을 받을 수 있어요.`);
+      }
+    }
+    document.getElementById('alert-modal').addEventListener('click', e => {
+      if (e.target === document.getElementById('alert-modal')) closeAlertModal();
+    });
 
     init();
   </script>
