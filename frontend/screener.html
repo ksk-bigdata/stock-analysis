@@ -373,7 +373,7 @@
       const startedAt = Date.now();
       ma60PollTimer = setInterval(async () => {
         try {
-          const st = await fetch(`${BASE}/api/screener/ma60/status`).then(r => r.json());
+          const st = await fetch(`${BASE}/api/screener/ma60/status?_=${Date.now()}`).then(r => r.json());
           const pct = st.total > 0 ? Math.round(st.progress / st.total * 100) : 0;
           document.getElementById('ma60-progress-fill').style.width = pct + '%';
 
@@ -464,7 +464,7 @@
 
       await fetch(`${BASE}/api/screener/smart-money/run`);
       smPollTimer = setInterval(async () => {
-        const st = await fetch(`${BASE}/api/screener/smart-money/status`).then(r => r.json());
+        const st = await fetch(`${BASE}/api/screener/smart-money/status?_=${Date.now()}`).then(r => r.json());
         if (st.status === 'done') {
           clearInterval(smPollTimer);
           await fetchSmResults();
