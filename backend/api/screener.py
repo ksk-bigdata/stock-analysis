@@ -167,7 +167,7 @@ async def smart_money_results(
 
 # ── MA60 돌파 스크리너 ────────────────────────────────
 _ma60_cache = {"data": None, "timestamp": 0, "status": "idle", "progress": 0, "total": 0}
-_ma60_executor = ThreadPoolExecutor(max_workers=10)
+_ma60_executor = ThreadPoolExecutor(max_workers=20)
 
 
 def _check_ma60(code, name, market):

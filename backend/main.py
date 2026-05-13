@@ -4,6 +4,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import asyncio
 import os
+import socket
+
+# fdr.DataReader 등 네트워크 요청이 무한 대기하는 것 방지
+socket.setdefaulttimeout(15)
 
 from api.stocks import router as stocks_router
 from api.screener import router as screener_router
