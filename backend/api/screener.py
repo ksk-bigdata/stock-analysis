@@ -221,27 +221,31 @@ async def _run_ma60_screener(top_n: int):
     _ma60_cache["data"] = None
     _ma60_cache["progress"] = 0
 
-    stock_list = get_krx_stock_list()
-    rows = stock_list.head(top_n).to_dict("records")
-    _ma60_cache["total"] = len(rows)
+    try:
+        stock_list = get_krx_stock_list()
+        rows = stock_list.head(top_n).to_dict("records")
+        _ma60_cache["total"] = len(rows)
 
-    loop = asyncio.get_event_loop()
-    tasks = [
-        loop.run_in_executor(_ma60_executor, _check_ma60, r["code"], r["name"], r["market"])
-        for r in rows
-    ]
+        loop = asyncio.get_event_loop()
+        tasks = [
+            loop.run_in_executor(_ma60_executor, _check_ma60, r["code"], r["name"], r["market"])
+            for r in rows
+        ]
 
-    results = []
-    for coro in asyncio.as_completed(tasks):
-        result = await coro
-        _ma60_cache["progress"] += 1
-        if result:
-            results.append(result)
+        results = []
+        for coro in asyncio.as_completed(tasks):
+            result = await coro
+            _ma60_cache["progress"] += 1
+            if result:
+                results.append(result)
 
-    # 신규 돌파 우선, 그 다음 streak 길이 순
-    results.sort(key=lambda x: (x["is_new_cross"], x["streak"]), reverse=True)
-    _ma60_cache["data"] = results
-    _ma60_cache["status"] = "done"
+        results.sort(key=lambda x: (x["is_new_cross"], x["streak"]), reverse=True)
+        _ma60_cache["data"] = results
+    except Exception as e:
+        _ma60_cache["data"] = []
+        _ma60_cache["error"] = str(e)
+    finally:
+        _ma60_cache["status"] = "done"
 
 
 @router.get("/ma60/run")
