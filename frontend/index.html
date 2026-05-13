@@ -43,6 +43,18 @@
   </div>
 
   <div class="container">
+    <!-- 관심종목 -->
+    <div id="watchlist-section" style="display:none">
+      <div class="section-title">
+        ★ 관심종목
+        <button class="btn btn-outline" onclick="clearWatchlist()" style="font-size:12px;color:var(--text-muted)">전체 삭제</button>
+      </div>
+      <div id="watchlist-table" style="margin-bottom:32px">
+        <div class="loading"><div class="spinner"></div>데이터 로딩 중...</div>
+      </div>
+    </div>
+
+    <!-- 인기 종목 -->
     <div class="section-title">
       인기 종목
       <a href="/screener" class="btn btn-outline" style="font-size:13px">종목 추천 보기 →</a>
@@ -118,6 +130,56 @@
     setupSearch('nav-search', 'nav-dropdown', goToChart);
     setupSearch('hero-search', 'hero-dropdown', goToChart);
 
+    // 관심종목
+    function getWatchlist() { return JSON.parse(localStorage.getItem('watchlist') || '[]'); }
+    function saveWatchlist(list) { localStorage.setItem('watchlist', JSON.stringify(list)); }
+    function removeFromWatchlist(code) {
+      saveWatchlist(getWatchlist().filter(s => s.code !== code));
+      loadWatchlist();
+    }
+    function clearWatchlist() {
+      if (!confirm('관심종목을 전부 삭제할까요?')) return;
+      saveWatchlist([]);
+      loadWatchlist();
+    }
+
+    function makeStockRow(d, showRemove = false) {
+      const s = d.summary;
+      const sign = s.change >= 0 ? '+' : '';
+      const cls = s.change >= 0 ? 'up' : 'down';
+      const removeBtn = showRemove
+        ? `<td><button onclick="removeFromWatchlist('${d.info.code}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px">✕</button></td>`
+        : '';
+      return `
+        <tr onclick="goToChart('${d.info.code}')" style="cursor:pointer">
+          <td><div class="stock-name-cell"><span class="name">${d.info.name}</span><span class="code">${d.info.code}</span></div></td>
+          <td>${d.info.market}</td>
+          <td style="font-weight:600">${s.close.toLocaleString()}원</td>
+          <td class="${cls}">${sign}${s.change.toLocaleString()}원</td>
+          <td class="${cls}">${sign}${s.change_pct}%</td>
+          <td>${(s.volume / 1000).toFixed(0)}천주</td>
+          <td>${s.rsi ?? '-'}</td>
+          ${removeBtn}
+        </tr>`;
+    }
+
+    async function loadWatchlist() {
+      const list = getWatchlist();
+      const section = document.getElementById('watchlist-section');
+      const container = document.getElementById('watchlist-table');
+      if (!list.length) { section.style.display = 'none'; return; }
+      section.style.display = 'block';
+      const results = await Promise.allSettled(
+        list.map(s => fetch(`${BASE}/api/stocks/${s.code}?period=30`).then(r => r.json()))
+      );
+      const rows = results.map(r => r.status === 'fulfilled' ? makeStockRow(r.value, true) : null).filter(Boolean);
+      container.innerHTML = `
+        <table>
+          <thead><tr><th>종목</th><th>시장</th><th>현재가</th><th>등락</th><th>등락률</th><th>거래량</th><th>RSI</th><th></th></tr></thead>
+          <tbody>${rows.join('')}</tbody>
+        </table>`;
+    }
+
     // 인기 종목 테이블
     async function loadPopular() {
       const container = document.getElementById('popular-table');
@@ -125,35 +187,15 @@
         POPULAR.map(s => fetch(`${BASE}/api/stocks/${s.code}?period=30`).then(r => r.json()))
       );
 
-      const rows = results.map((r, i) => {
-        if (r.status !== 'fulfilled') return null;
-        const d = r.value;
-        const s = d.summary;
-        const sign = s.change >= 0 ? '+' : '';
-        const cls = s.change >= 0 ? 'up' : 'down';
-        return `
-          <tr onclick="goToChart('${d.info.code}')" style="cursor:pointer">
-            <td><div class="stock-name-cell"><span class="name">${d.info.name}</span><span class="code">${d.info.code}</span></div></td>
-            <td>${d.info.market}</td>
-            <td style="font-weight:600">${s.close.toLocaleString()}원</td>
-            <td class="${cls}">${sign}${s.change.toLocaleString()}원</td>
-            <td class="${cls}">${sign}${s.change_pct}%</td>
-            <td>${(s.volume / 1000).toFixed(0)}천주</td>
-            <td>${s.rsi ?? '-'}</td>
-          </tr>`;
-      }).filter(Boolean);
-
+      const rows = results.map(r => r.status === 'fulfilled' ? makeStockRow(r.value) : null).filter(Boolean);
       container.innerHTML = `
         <table>
-          <thead>
-            <tr>
-              <th>종목</th><th>시장</th><th>현재가</th><th>등락</th><th>등락률</th><th>거래량</th><th>RSI</th>
-            </tr>
-          </thead>
+          <thead><tr><th>종목</th><th>시장</th><th>현재가</th><th>등락</th><th>등락률</th><th>거래량</th><th>RSI</th></tr></thead>
           <tbody>${rows.join('')}</tbody>
         </table>`;
     }
 
+    loadWatchlist();
     loadPopular();
   </script>
 </body>

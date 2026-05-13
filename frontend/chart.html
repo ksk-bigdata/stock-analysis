@@ -238,6 +238,29 @@
       renderIndicator(sliceData(currentPeriod));
     }
 
+    // 관심종목 localStorage 유틸
+    function getWatchlist() { return JSON.parse(localStorage.getItem('watchlist') || '[]'); }
+    function saveWatchlist(list) { localStorage.setItem('watchlist', JSON.stringify(list)); }
+    function isWatched(code) { return getWatchlist().some(s => s.code === code); }
+    function toggleWatchlist(code, name) {
+      let list = getWatchlist();
+      if (isWatched(code)) {
+        list = list.filter(s => s.code !== code);
+      } else {
+        list.push({ code, name });
+      }
+      saveWatchlist(list);
+      updateStarBtn(code);
+    }
+    function updateStarBtn(code) {
+      const btn = document.getElementById('watch-btn');
+      if (!btn) return;
+      const watched = isWatched(code);
+      btn.textContent = watched ? '★ 관심종목' : '☆ 관심종목';
+      btn.style.color = watched ? '#f0b429' : '';
+      btn.style.borderColor = watched ? '#f0b429' : '';
+    }
+
     function renderHeader(info, summary) {
       const sign = summary.change >= 0 ? '+' : '';
       const cls = summary.change >= 0 ? 'up' : 'down';
@@ -247,10 +270,14 @@
           <div style="font-size:22px;font-weight:700">${info.name}</div>
           <div style="color:var(--text-muted);margin-top:2px">${info.code} · ${info.market}</div>
         </div>
-        <div style="margin-left:auto;text-align:right">
-          <div class="stat-value ${cls}">${summary.close.toLocaleString()}원</div>
-          <div class="stat-change ${cls}">${sign}${summary.change.toLocaleString()} (${sign}${summary.change_pct}%)</div>
+        <div style="margin-left:auto;text-align:right;display:flex;align-items:center;gap:12px">
+          <button id="watch-btn" class="btn btn-outline" onclick="toggleWatchlist('${info.code}','${info.name}')" style="font-size:13px">☆ 관심종목</button>
+          <div>
+            <div class="stat-value ${cls}">${summary.close.toLocaleString()}원</div>
+            <div class="stat-change ${cls}">${sign}${summary.change.toLocaleString()} (${sign}${summary.change_pct}%)</div>
+          </div>
         </div>`;
+      updateStarBtn(info.code);
     }
 
     function scoreColor(s) {
