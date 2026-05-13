@@ -268,9 +268,12 @@
     }
 
     function renderSignalsAndScore(data) {
-      // 마지막 데이터에서 시그널 재계산은 백엔드에서 하므로 프론트에서 간단 표시
-      const latest = data[data.length - 1];
-      if (!latest) return;
+      const latest = data && data.length > 0 ? data[data.length - 1] : null;
+      if (!latest) {
+        document.getElementById('signals-list').innerHTML = '<div style="color:var(--text-muted)">데이터 없음</div>';
+        document.getElementById('score-panel').innerHTML = '<div style="color:var(--text-muted)">데이터 없음</div>';
+        return;
+      }
 
       // 간단 시그널 계산 (프론트)
       const signals = [];
@@ -334,9 +337,14 @@
       const json = await res.json();
       allData = json.ohlcv;
       renderHeader(json.info, json.summary);
-      const sliced = sliceData(currentPeriod);
-      renderCharts(sliced);
-      renderSignalsAndScore(sliced);
+      // 시그널/점수는 차트 렌더링 성공여부와 무관하게 항상 표시
+      renderSignalsAndScore(allData);
+      try {
+        const sliced = sliceData(currentPeriod);
+        renderCharts(sliced);
+      } catch(e) {
+        console.error('차트 렌더링 오류:', e);
+      }
       // 2년 데이터 백그라운드 로드
       fetch(`${BASE}/api/stocks/${CODE}?period=730`).then(r => r.json()).then(j => { allData = j.ohlcv; });
     }
