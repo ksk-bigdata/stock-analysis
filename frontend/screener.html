@@ -124,11 +124,13 @@
       </div>
       <div class="filter-row" style="margin-top:8px">
         <span style="color:var(--text-muted);font-size:13px">유지일수:</span>
-        <button class="btn btn-outline active ma60-streak-btn" onclick="filterMA60Streak(2,this)">2일+</button>
-        <button class="btn btn-outline ma60-streak-btn" onclick="filterMA60Streak(3,this)">3일+</button>
-        <button class="btn btn-outline ma60-streak-btn" onclick="filterMA60Streak(4,this)">4일+</button>
-        <button class="btn btn-outline ma60-streak-btn" onclick="filterMA60Streak(5,this)">5일+</button>
-        <button class="btn btn-outline ma60-streak-btn" onclick="filterMA60Streak(10,this)">10일+</button>
+        <button class="btn btn-outline active ma60-streak-btn" onclick="filterMA60Streak('all',this)">전체</button>
+        <button class="btn btn-outline ma60-streak-btn" onclick="filterMA60Streak(2,this)">2일</button>
+        <button class="btn btn-outline ma60-streak-btn" onclick="filterMA60Streak(3,this)">3일</button>
+        <button class="btn btn-outline ma60-streak-btn" onclick="filterMA60Streak(4,this)">4일</button>
+        <button class="btn btn-outline ma60-streak-btn" onclick="filterMA60Streak(5,this)">5일</button>
+        <button class="btn btn-outline ma60-streak-btn" onclick="filterMA60Streak(6,this)">6일</button>
+        <button class="btn btn-outline ma60-streak-btn" onclick="filterMA60Streak(7,this)">7일+</button>
       </div>
       <div class="progress-bar" id="ma60-progress-bar" style="display:none">
         <div class="progress-fill" id="ma60-progress-fill" style="width:0%"></div>
@@ -353,7 +355,7 @@
     // ── MA60 돌파 스크리너 ──────────────────────────────
     let ma60Filter = 'all';
     let ma60Market = 'ALL';
-    let ma60MinStreak = 2;
+    let ma60StreakVal = 'all';
     let ma60PollTimer;
     let ma60AllResults = [];
 
@@ -379,8 +381,8 @@
       btn.classList.add('active');
       applyMA60Filter();
     }
-    function filterMA60Streak(n, btn) {
-      ma60MinStreak = n;
+    function filterMA60Streak(val, btn) {
+      ma60StreakVal = val;
       document.querySelectorAll('.ma60-streak-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       applyMA60Filter();
@@ -442,7 +444,10 @@
       let data = ma60AllResults;
       if (ma60Market !== 'ALL') data = data.filter(d => d.market === ma60Market);
       if (ma60Filter === 'new_cross') data = data.filter(d => d.is_new_cross);
-      data = data.filter(d => d.streak >= ma60MinStreak);
+      if (ma60StreakVal !== 'all') {
+        if (ma60StreakVal >= 7) data = data.filter(d => d.streak >= ma60StreakVal);
+        else data = data.filter(d => d.streak === ma60StreakVal);
+      }
       renderMA60Results(data);
       document.getElementById('ma60-status-text').textContent = `${data.length}개 종목 탐지`;
     }
