@@ -1,4 +1,4 @@
-const API = '';
+const API = 'https://stock-analysis-i3xj.onrender.com';
 
 async function checkAuth() {
   const token = localStorage.getItem('kr_stock_token');
